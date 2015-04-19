@@ -1,9 +1,8 @@
 #include "VirtualMachine.h"
-#include "VirtualMachineUtils.c"
 #include <unistd.h>
 
-extern "C"
-{
+extern VMLoadModule(const char *module);
+extern VMUnloadModule(void);
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
@@ -34,5 +33,3 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
   }
   return VM_STATUS_FAILURE;
 } // VMFileWrite
-
-} // extern "C"
