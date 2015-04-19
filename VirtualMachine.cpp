@@ -1,4 +1,5 @@
 #include "VirtualMachine.h"
+#include "VirtualMachineUtils.c"
 #include <unistd.h>
 
 extern TVMMainEntry VMLoadModule(const char *module);
