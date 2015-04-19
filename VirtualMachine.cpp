@@ -1,5 +1,6 @@
 #include "VirtualMachine.h"
 #include "VirtualMachineUtils.c"
+#include <unistd.h>
 
 extern "C"
 {
