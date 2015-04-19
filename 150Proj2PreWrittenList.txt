@@ -13,20 +13,19 @@ VMMutexDelete
 VMMutexQuery
 VMMutexAcquire
 VMMutexRelease
-VMPrint
-VMPrintError
 VMFileOpen
 VMFileClose
 VMFileRead
 VMFileWrite
 VMFileSeek
-MachineContextSave
-MachineContextRestore
-MachineContextSwitch
-
 
 Pre-Implemented
 
+MachineContextSave
+MachineContextRestore
+MachineContextSwitch
+VMPrint
+VMPrintError
 VMLoadModule
 VMUnloadModule
 VMFilePrint

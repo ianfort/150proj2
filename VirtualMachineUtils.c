@@ -47,4 +47,3 @@ TVMStatus VMFilePrint(int filedescriptor, const char *format, ...){
     free(OutputBuffer);
     return ReturnValue;
 }
-
