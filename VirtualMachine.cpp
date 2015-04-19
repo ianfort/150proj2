@@ -1,13 +1,12 @@
 #include "VirtualMachine.h"
 #include <unistd.h>
 
-extern VMLoadModule(const char *module);
-extern VMUnloadModule(void);
+extern TVMMainEntry VMLoadModule(const char *module);
+extern void VMUnloadModule(void);
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
-  TVMMainEntry mainFunc;
-  mainFunc = VMLoadModule(argv[0]);
+  TVMMainEntry mainFunc = VMLoadModule(argv[0]);
   if (mainFunc)
   {
     mainFunc(argc, argv);
