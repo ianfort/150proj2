@@ -1,4 +1,5 @@
 #include "VirtualMachine.h"
+#include "VirtualMachineUtils.c"
 
 extern "C"
 {
