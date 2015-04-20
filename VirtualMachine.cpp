@@ -56,6 +56,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   else
   {
     while (ticks < tick);
+    //this should not just be a blind wait loop; should probably pass run time to next thread. Update later.
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
 
   return VM_STATUS_SUCCESS;
