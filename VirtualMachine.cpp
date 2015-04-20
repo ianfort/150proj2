@@ -27,6 +27,22 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 } //VMStart
 
 
+TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescriptor)
+{
+  if (filename == NULL || filedescriptor == NULL)
+  {
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+  }
+  //change thread state to VM_THREAD_STATE_WAITING
+  MachineFileOpen(filename, flags, mode, filedescriptor, NULL);
+  // void MachineFileOpen(const char *filename, int flags, int mode, TMachineFileCallback callback, void *calldata);
+
+  //change thread state to VM_THREAD_STATE_READY
+  return VM_STATUS_SUCCESS;
+//  return VM_STATUS_FAILURE;
+} // VMFileOpen
+
+
 TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 {
   if (!data || !length)
@@ -63,9 +79,12 @@ TVMStatus VMThreadSleep(TVMTick tick)
 }
 
 
+
+
 void incrementTicks(void*)
 {
   ticks += 1;
 }//helper function for sleeping
+
 
 
