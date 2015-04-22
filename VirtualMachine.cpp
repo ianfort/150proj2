@@ -89,10 +89,33 @@ TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
   while (no == -728);
   if (newoffset)
   {
-    no = *newoffset;
+    newoffset = &no;
   }
   //make thread stop waiting
 
+  if (no < 0)
+    return VM_STATUS_FAILURE;
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
+
+
+TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
+{
+  // void MachineFileSeek(int fd, int offset, int whence, TMachineFileCallback callback, void *calldata);
+  int len = -728;
+
+  if (!data || !length)
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+
+  // Make thread wait
+  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&len);
+
+  while (len == -728);
+  length = &len;
+  //make thread stop waiting
+
+  if (len < 0)
+    return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
 
