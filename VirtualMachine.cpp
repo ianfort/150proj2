@@ -11,6 +11,7 @@ void fileCallback(void* calldata, int result);
 void incrementTicks(void*);
 
 volatile unsigned int ticks;
+volatile int cd; //calldata
 
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
@@ -24,27 +25,26 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     mainFunc(argc, argv);
     VMUnloadModule();
+    MachineTerminate();
     return VM_STATUS_SUCCESS;
   }
-  
+  MachineTerminate();
   return VM_STATUS_FAILURE;
 } //VMStart
 
 
 TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescriptor)
 {
-  *filedescriptor = -2; //impossible to have a negative file descriptor
+  cd = -2; //impossible to have a negative file descriptor
   if (filename == NULL || filedescriptor == NULL)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }
   //change thread state to VM_THREAD_STATE_WAITING
-  MachineFileOpen(filename, flags, mode, fileCallback, (void*)filedescriptor);
+  MachineFileOpen(filename, flags, mode, fileCallback, (void*)&cd);
   // void MachineFileOpen(const char *filename, int flags, int mode, TMachineFileCallback callback, void *calldata);
-  while((*filedescriptor) < 0)
-  {
-    cout << *filedescriptor << "\n";
-  } //wait until file is actually open
+  while((cd) < 0); //wait until file is actually open
+  *filedescriptor = cd;
   //change thread state to VM_THREAD_STATE_READY
   return VM_STATUS_SUCCESS;
 //  return VM_STATUS_FAILURE;
@@ -53,40 +53,29 @@ TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescrip
 
 TVMStatus VMFileClose(int filedescriptor)
 {
-  int data = 1;
-
+  cd = 1;
   // Make thread wait here.
-  cout << filedescriptor << "\n";
-  cout << "pre-segfault" << "\n";
-  MachineFileClose(filedescriptor, fileCallback, (void*)data);
-  while (data > 0)
-  {
-    cout << data << "\n";
-  } //wait until data has been altered
+  MachineFileClose(filedescriptor, fileCallback, (void*)&cd);
+  while (cd > 0); //wait until data has been altered
   // Change thread state to Stop waiting.
-
-  if ( data < 0 )
+  if (cd < 0)
   {
     return VM_STATUS_FAILURE;
   }//negative result is a failure
-
   return VM_STATUS_SUCCESS;
-}
+}//TVMStatus VMFileClose(int filedescriptor)
 
 
 TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 {
-  int no = -739;
+  cd = -739;
   if (!data || !length)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }
-  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)&no);
-  while (no == -739)
-  {
-    cout << no << "\n";
-  }
-  if(no >= 0)
+  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)&cd);
+  while (cd == -739);
+  if(cd >= 0)
   {
     return VM_STATUS_SUCCESS;
   }
@@ -97,22 +86,16 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 {
   // void MachineFileSeek(int fd, int offset, int whence, TMachineFileCallback callback, void *calldata);
-  int no = -728;
-
+  cd = -728;
   // Make thread wait
-  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)&no);
-
-  while (no == -728)
-  {
-    cout << no << "\n";
-  }
+  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)&cd);
+  while (cd == -728);
   if (newoffset)
   {
-    newoffset = &no;
+    *newoffset = cd;
   }
   //make thread stop waiting
-
-  if (no < 0)
+  if (cd < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
@@ -120,22 +103,17 @@ TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 
 TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 {
-  // void MachineFileSeek(int fd, int offset, int whence, TMachineFileCallback callback, void *calldata);
-  int len = -728;
+  cd = -728;
 
   if (!data || !length)
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   // Make thread wait
-  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&len);
-
-  while (len == -728)
-  {
-    cout << len << "\n";
-  }
-  length = &len;
+  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&cd);
+  while (cd == -728);
+  *length = cd;
   //make thread stop waiting
 
-  if (len < 0)
+  if (cd < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
@@ -161,6 +139,12 @@ TVMStatus VMThreadSleep(TVMTick tick)
   return VM_STATUS_SUCCESS;
 }
 
+/*
+TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
+{
+
+}//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
+*/
 
 void fileCallback(void* calldata, int result)
 {
