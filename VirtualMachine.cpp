@@ -2,6 +2,8 @@
 #include "Machine.h"
 #include <unistd.h>
 #include <iostream>
+#include <vector>
+#include "Thread.h"
 
 using namespace std;
 
@@ -10,13 +12,13 @@ extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
 void incrementTicks(void*);
 
-volatile unsigned int ticks;
-volatile int cd; //calldata
-
+volatile vector<Thread*> *threads;
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
-{
+{ 
   ticks = 0;
+  threads = new vector<Thread*>;
+  
   TVMMainEntry mainFunc = VMLoadModule(argv[0]);
   MachineInitialize(machinetickms);
   MachineRequestAlarm((tickms*1000), incrementTicks, NULL);
@@ -26,9 +28,11 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
     mainFunc(argc, argv);
     VMUnloadModule();
     MachineTerminate();
+    delete threads;
     return VM_STATUS_SUCCESS;
   }
   MachineTerminate();
+  delete threads;
   return VM_STATUS_FAILURE;
 } //VMStart
 
@@ -121,7 +125,7 @@ TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 
 TVMStatus VMThreadSleep(TVMTick tick)
 {
-  ticks = 0;
+  ticks = 0; //set this.thread->resetTicks()
   if (tick == VM_TIMEOUT_IMMEDIATE)
   {
     // the current process yields the remainder of its processing quantum to the next ready process of equal priority.
@@ -139,12 +143,23 @@ TVMStatus VMThreadSleep(TVMTick tick)
   return VM_STATUS_SUCCESS;
 }
 
-/*
+
 TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
 {
-
+  Thread* t = new Thread;
+  t->setPriority(prio);
+  t->setID(*tid);
+  if (!entry || !tid)
+  {
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+  }//INVALID PARAMS, must not be NULL
+  (void*) stackaddr = new (void*)(memsize);
+  threads->push_back(t);
+//  void MachineContextCreate(SMachineContextRef mcntxref, void (*entry)(void *), void *param, void *stackaddr, size_t stacksize);
+  MachineContextCreate(t->getContextRef(), (void*)entry, param, (void*) stackaddr, size_t memsize);
+  return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
-*/
+
 
 void fileCallback(void* calldata, int result)
 {
@@ -155,7 +170,10 @@ void fileCallback(void* calldata, int result)
 
 void incrementTicks(void*)
 {
-  ticks += 1;
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    itr->incrementTicks();
+  }//add one tick passed to every thread
 }//helper function for sleeping
 
 
