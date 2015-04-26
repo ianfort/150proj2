@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+#include <queue>
 #include "Thread.h"
 
 #define NUM_RQS                                 4
@@ -13,16 +14,16 @@ using namespace std;
 extern "C" TVMMainEntry VMLoadModule(const char *module);
 extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
-void incrementTicks(void*);
+void decrementTicks(void*);
 
-volatile TVMThreadID nextID; //increment every time a thread is created. Decrement never.
-volatile vector<Thread*> *threads;
+TVMThreadID nextID; //increment every time a thread is created. Decrement never.
+vector<Thread*> *threads;
+Thread* tr;
 queue<Thread*> *readyQ[NUM_RQS];
 
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
-{ 
-  Thread* nextThread;
+{
   bool live = true;
   Thread* mainThread;
   nextID = 0;
@@ -39,12 +40,13 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
   MachineInitialize(machinetickms);
-  MachineRequestAlarm((tickms*1000), incrementTicks, NULL);
+  MachineRequestAlarm((tickms*1000), decrementTicks, NULL);
   MachineEnableSignals();
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_HIGH);
   mainThread->setState(VM_THREAD_STATE_READY);
-  mainThread->setId(nextID);
+  mainThread->setID(nextID);
+//  mainThread->setEntry(mainFunc);
   nextID++;
   readyQ[mainThread->getPriority()]->push(mainThread);
 
@@ -52,29 +54,28 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
     {
-      nextThread = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
+      tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
       readyQ[VM_THREAD_PRIORITY_HIGH]->pop();
     }//if there's anything in hi-pri, run it
     else if (!readyQ[VM_THREAD_PRIORITY_NORMAL]->empty())
     {
-      nextThread = readyQ[VM_THREAD_PRIORITY_NORMAL]->front();
+      tr = readyQ[VM_THREAD_PRIORITY_NORMAL]->front();
       readyQ[VM_THREAD_PRIORITY_NORMAL]->pop();
     }//if there's anything in med-pri, run it
     else if (!readyQ[VM_THREAD_PRIORITY_LOW]->empty())
     {
-      nextThread = readyQ[VM_THREAD_PRIORITY_LOW]->front();
+      tr = readyQ[VM_THREAD_PRIORITY_LOW]->front();
       readyQ[VM_THREAD_PRIORITY_LOW]->pop();
     }//if there's anything in low-pri, run it
     else
     {
-      nextThread = NULL;
-    }//if there's nothing in any of the RQs, do nothing
-    if (nextThread)
-    {
-      //save current context
-      //load context of nextThread
-      //run nextThread for one tick       //mainFunc(argc, argv);
-    }//do the next thread
+      tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
+      //need to pre-load this Q with the idle process (which just sleeps forever)
+    }//if there's nothing in any of the RQs, spin
+    //save current context
+    //load context of next Thread
+    //run thread for one tick       //mainFunc(argc, argv);
+    //do the next thread
     if (mainThread->getState() == VM_THREAD_STATE_DEAD)
     {
       live = false;
@@ -90,16 +91,16 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 
 TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescriptor)
 {
-  cd = -2; //impossible to have a negative file descriptor
+  tr->cd = -2; //impossible to have a negative file descriptor
   if (filename == NULL || filedescriptor == NULL)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }
   //change thread state to VM_THREAD_STATE_WAITING
-  MachineFileOpen(filename, flags, mode, fileCallback, (void*)&cd);
+  MachineFileOpen(filename, flags, mode, fileCallback, (void*)&(tr->cd));
   // void MachineFileOpen(const char *filename, int flags, int mode, TMachineFileCallback callback, void *calldata);
-  while((cd) < 0); //wait until file is actually open
-  *filedescriptor = cd;
+  while((tr->cd) < 0); //wait until file is actually open
+  *filedescriptor = tr->cd;
   //change thread state to VM_THREAD_STATE_READY
   return VM_STATUS_SUCCESS;
 //  return VM_STATUS_FAILURE;
@@ -108,12 +109,12 @@ TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescrip
 
 TVMStatus VMFileClose(int filedescriptor)
 {
-  cd = 1;
+  tr->cd = 1;
   // Make thread wait here.
-  MachineFileClose(filedescriptor, fileCallback, (void*)&cd);
-  while (cd > 0); //wait until data has been altered
+  MachineFileClose(filedescriptor, fileCallback, (void*)&(tr->cd));
+  while (tr->cd > 0); //wait until data has been altered
   // Change thread state to Stop waiting.
-  if (cd < 0)
+  if (tr->cd < 0)
   {
     return VM_STATUS_FAILURE;
   }//negative result is a failure
@@ -123,14 +124,14 @@ TVMStatus VMFileClose(int filedescriptor)
 
 TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 {
-  cd = -739;
+  tr->cd = -739;
   if (!data || !length)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }
-  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)&cd);
-  while (cd == -739);
-  if(cd >= 0)
+  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)&(tr->cd));
+  while (tr->cd == -739);
+  if(tr->cd >= 0)
   {
     return VM_STATUS_SUCCESS;
   }
@@ -141,16 +142,16 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 {
   // void MachineFileSeek(int fd, int offset, int whence, TMachineFileCallback callback, void *calldata);
-  cd = -728;
+  tr->cd = -728;
   // Make thread wait
-  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)&cd);
-  while (cd == -728);
+  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)&(tr->cd));
+  while (tr->cd == -728);
   if (newoffset)
   {
-    *newoffset = cd;
+    *newoffset = tr->cd;
   }
   //make thread stop waiting
-  if (cd < 0)
+  if (tr->cd < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
@@ -158,17 +159,17 @@ TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 
 TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 {
-  cd = -728;
+  tr->cd = -728;
 
   if (!data || !length)
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   // Make thread wait
-  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&cd);
-  while (cd == -728);
-  *length = cd;
+  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&(tr->cd));
+  while (tr->cd == -728);
+  *length = tr->cd;
   //make thread stop waiting
 
-  if (cd < 0)
+  if (tr->cd < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
@@ -187,27 +188,39 @@ TVMStatus VMThreadSleep(TVMTick tick)
   }
   else
   {
-    ticks = 0; //set this.thread->setTicks(tick)
-    //this.thread->setState(VM_THREAD_WAITING)
+    tr->setTicks(tick);
+    //tr->setState(VM_THREAD_WAITING)
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
 
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadSleep(TVMTick tick)
 
 
+TVMStatus VMThreadID(TVMThreadIDRef threadref)
+{
+  if (!threadref)
+  {
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+  }//if threadref is a null pointer
+  threadref = tr->getIDRef();
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMThreadID(TVMThreadIDRef threadref)
+
+
 TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
 {
-  Thread* t = new Thread;
-  t->setPriority(prio);
-  t->setID(*tid);
+  SMachineContext context;
   if (!entry || !tid)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//INVALID PARAMS, must not be NULL
-  (void*) stackaddr = new (void*)(memsize);
+  stack<void*> *mem = new stack<void*>;
+  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, entry, param);
+  nextID++;
   threads->push_back(t);
 //  void MachineContextCreate(SMachineContextRef mcntxref, void (*entry)(void *), void *param, void *stackaddr, size_t stacksize);
-  MachineContextCreate(t->getContextRef(), (void*)entry, param, (void*) stackaddr, size_t memsize);
+  MachineContextCreate(&context, entry, param, (void*) mem, memsize);
+  t->setContext(context);
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
 
@@ -219,11 +232,11 @@ void fileCallback(void* calldata, int result)
 }//void fileCallback(void* calldata, int result)
 
 
-void incrementTicks(void*)
+void decrementTicks(void*)
 {
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
-    itr->decrementTicks();
+    (*itr)->decrementTicks();
   }//add one tick passed to every thread
 }//helper function for sleeping
 

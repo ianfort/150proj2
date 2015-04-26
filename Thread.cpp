@@ -1,31 +1,31 @@
 #include "Thread.h"
 
 
-/*
-  SMachineContext context;
-  SMachineContextRef contextRef;
-  TVMThreadPriority priority;
-  TVMThreadState state;
-  TVMThreadID id;
-  stack<void*> TStack;
-  int ticksLeft;
-  ThreadEntry entryFunc
-  void* entryParam;
-*/
-
-/*
-Thread::Thread(const SMachineContext &ctxt, const SMachineContextRef contextRef, const TVMThreadPriority &priority,
-		const TVMThreadState &state, const TVMThreadID &id, const stack<void*> &TStack, const int &ticksLeft,
-		const  ThreadEntry &entryFunc, )
+Thread::Thread()
 {
-  context 
-}
+}//default/empty constructor
 
 
-Thread::Thread~()
+Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid,
+               stack<void*> *ts, const ThreadEntry &entryFunc, void *p)
 {
-}
-*/
+  tStack = NULL;
+  priority = pri;
+  state = st;
+  id = tid;
+  if (ts)
+    tStack = ts;
+  entry = entryFunc;
+  param = p;
+}//constructor
+
+
+Thread::~Thread()
+{
+  if (tStack)
+    delete tStack;
+}//default destructor
+
 
 SMachineContext* Thread::getContextRef()
 {
@@ -40,20 +40,45 @@ void Thread::decrementTicks()
   {
     state = VM_THREAD_STATE_READY;
     //insert in correct ready queue here
-  }
+    ticks = 0;
+  }//if no need to be asleep
 }//void Thread::decrementTicks()
 
+/*
+volatile int Thread::getcd()
+{
+  return cd;
+}//volatile int Thread::getcd()
+*/
 
-TVMThreadPriority getPriority()
+TVMThreadIDRef Thread::getIDRef()
+{
+  return &id;
+}//TVMThreadID Thread::getIDRef()
+
+
+TVMThreadPriority Thread::getPriority()
 {
   return priority;
-}//TVMThreadPriority getPriority()
+}//TVMThreadPriority Thread::getPriority()
 
 
-TVMThreadState getState()
+TVMThreadState Thread::getState()
 {
   return state;
-}//TVMThreadState getState()
+}//TVMThreadState Thread::getState()
+
+/*
+void setcd(volatile int calldata)
+{
+  cd = calldata;
+}//void Thread::setcd(volatile int calldata)
+*/
+
+void Thread::setContext(SMachineContext c)
+{
+  context = c;
+}//void Thread::setContext(SMachineContext c)
 
 
 void Thread::setID(TVMThreadID newID)
@@ -68,13 +93,13 @@ void Thread::setPriority(TVMThreadPriority pri)
 }//void Thread::setPriority(TVMThreadPriority pri)
 
 
-void setState(TVMThreadState newstate)
+void Thread::setState(TVMThreadState newstate)
 {
   state = newstate;
-}//void setState(TVMThreadState newstate)
+}//void Thread::setState(TVMThreadState newstate)
 
 
-void Thread::setTicks(unsigned int newticks)
+void Thread::setTicks(volatile unsigned int newticks)
 {
   ticks = newticks;
 }//void Thread::setTicks(unsigned int newticks)
