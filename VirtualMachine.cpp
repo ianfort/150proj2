@@ -5,6 +5,9 @@
 #include <vector>
 #include "Thread.h"
 
+#define NUM_RQS                                 4
+#define VM_THREAD_PRIORITY_NIL                  ((TVMThreadPriority)0x00)
+
 using namespace std;
 
 extern "C" TVMMainEntry VMLoadModule(const char *module);
@@ -12,28 +15,76 @@ extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
 void incrementTicks(void*);
 
+volatile TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 volatile vector<Thread*> *threads;
+queue<Thread*> *readyQ[NUM_RQS];
+
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 { 
-  ticks = 0;
-  threads = new vector<Thread*>;
-  
+  Thread* nextThread;
+  bool live = true;
+  Thread* mainThread;
+  nextID = 0;
+
   TVMMainEntry mainFunc = VMLoadModule(argv[0]);
+  if (!mainFunc)
+  {
+    return VM_STATUS_FAILURE;
+  }//if mainFunc doesn't load, kill yourself
+
+  threads = new vector<Thread*>;
+  for (int i = 0; i < NUM_RQS; i++)
+  {
+    readyQ[i] = new queue<Thread*>;
+  }//allocate memory for ready queues
   MachineInitialize(machinetickms);
   MachineRequestAlarm((tickms*1000), incrementTicks, NULL);
   MachineEnableSignals();
-  if (mainFunc)
+  mainThread = new Thread;
+  mainThread->setPriority(VM_THREAD_PRIORITY_HIGH);
+  mainThread->setState(VM_THREAD_STATE_READY);
+  mainThread->setId(nextID);
+  nextID++;
+  readyQ[mainThread->getPriority()]->push(mainThread);
+
+  while (live)
   {
-    mainFunc(argc, argv);
-    VMUnloadModule();
-    MachineTerminate();
-    delete threads;
-    return VM_STATUS_SUCCESS;
-  }
+    if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
+    {
+      nextThread = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
+      readyQ[VM_THREAD_PRIORITY_HIGH]->pop();
+    }//if there's anything in hi-pri, run it
+    else if (!readyQ[VM_THREAD_PRIORITY_NORMAL]->empty())
+    {
+      nextThread = readyQ[VM_THREAD_PRIORITY_NORMAL]->front();
+      readyQ[VM_THREAD_PRIORITY_NORMAL]->pop();
+    }//if there's anything in med-pri, run it
+    else if (!readyQ[VM_THREAD_PRIORITY_LOW]->empty())
+    {
+      nextThread = readyQ[VM_THREAD_PRIORITY_LOW]->front();
+      readyQ[VM_THREAD_PRIORITY_LOW]->pop();
+    }//if there's anything in low-pri, run it
+    else
+    {
+      nextThread = NULL;
+    }//if there's nothing in any of the RQs, do nothing
+    if (nextThread)
+    {
+      //save current context
+      //load context of nextThread
+      //run nextThread for one tick       //mainFunc(argc, argv);
+    }//do the next thread
+    if (mainThread->getState() == VM_THREAD_STATE_DEAD)
+    {
+      live = false;
+    }//do when mainFunc's state is VM_THREAD_STATE_DEAD (program over)
+  }//while loop choosing the correct thread (highest priority non-empty ready queue) and running it
+
+  VMUnloadModule();
   MachineTerminate();
   delete threads;
-  return VM_STATUS_FAILURE;
+  return VM_STATUS_SUCCESS;
 } //VMStart
 
 
@@ -125,10 +176,10 @@ TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 
 TVMStatus VMThreadSleep(TVMTick tick)
 {
-  ticks = 0; //set this.thread->resetTicks()
   if (tick == VM_TIMEOUT_IMMEDIATE)
   {
     // the current process yields the remainder of its processing quantum to the next ready process of equal priority.
+    //change status from running to ready (NOT WAITING); reinsert at back of correct ready queue
   }
   else if (tick == VM_TIMEOUT_INFINITE)
   {
@@ -136,12 +187,12 @@ TVMStatus VMThreadSleep(TVMTick tick)
   }
   else
   {
-    while (ticks < tick);
-    //this should not just be a blind wait loop; should probably pass run time to next thread. Update later.
+    ticks = 0; //set this.thread->setTicks(tick)
+    //this.thread->setState(VM_THREAD_WAITING)
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
 
   return VM_STATUS_SUCCESS;
-}
+}//TVMStatus VMThreadSleep(TVMTick tick)
 
 
 TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
@@ -172,7 +223,7 @@ void incrementTicks(void*)
 {
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
-    itr->incrementTicks();
+    itr->decrementTicks();
   }//add one tick passed to every thread
 }//helper function for sleeping
 

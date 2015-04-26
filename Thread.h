@@ -17,15 +17,19 @@ class Thread
   volatile unsigned int ticks;
   volatile int cd; //calldata
 //  stack<void*> TStack;
-//  int ticksLeft;
+//entry point
+//entry params
 public:
 //  Thread();
 //  Thread~();
   SMachineContext* getContextRef();
-  void incrementTicks();
-  void resetTicks();
+  void decrementTicks();
+  TVMThreadPriority getPriority();
+  TVMThreadState getState();
   void setID(TVMThreadID newID);
   void setPriority(TVMThreadPriority pri);
+  void setState(TVMThreadState newstate);
+  void setTicks(unsigned int newticks);
 };
 
 

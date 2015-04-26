@@ -33,16 +33,27 @@ SMachineContext* Thread::getContextRef()
 }//Thread::SMachineContext* getContextRef()
 
 
-void Thread::incrementTicks()
+void Thread::decrementTicks()
 {
-  ticks++;
-}//void Thread::incrementTicks()
+  ticks--;
+  if (ticks <= 0 && state == VM_THREAD_STATE_WAITING)
+  {
+    state = VM_THREAD_STATE_READY;
+    //insert in correct ready queue here
+  }
+}//void Thread::decrementTicks()
 
 
-void Thread::resetTicks()
+TVMThreadPriority getPriority()
 {
-  ticks = 0;
-}//void Thread::resetTicks()
+  return priority;
+}//TVMThreadPriority getPriority()
+
+
+TVMThreadState getState()
+{
+  return state;
+}//TVMThreadState getState()
 
 
 void Thread::setID(TVMThreadID newID)
@@ -56,5 +67,16 @@ void Thread::setPriority(TVMThreadPriority pri)
   priority = pri;
 }//void Thread::setPriority(TVMThreadPriority pri)
 
+
+void setState(TVMThreadState newstate)
+{
+  state = newstate;
+}//void setState(TVMThreadState newstate)
+
+
+void Thread::setTicks(unsigned int newticks)
+{
+  ticks = newticks;
+}//void Thread::setTicks(unsigned int newticks)
 
 
