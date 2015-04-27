@@ -1,13 +1,23 @@
 #ifndef THREAD_H
 #define THREAD_H
 
+#include <unistd.h>
+#include <vector>
 #include "VirtualMachine.h"
 #include "Machine.h"
+#include <iostream>
+#include <queue>
 
 using namespace std;
 
 // extern "C"
 // {
+
+#define NUM_RQS                                 4
+#define VM_THREAD_PRIORITY_NIL                  ((TVMThreadPriority)0x00)
+
+class Thread;
+extern queue<Thread*> *readyQ[NUM_RQS];
 
 typedef void (*ThreadEntry)(void *param);
 
@@ -15,9 +25,9 @@ class Thread
 {
   SMachineContext context;
   TVMThreadPriority priority;
-  TVMThreadState state;
+  volatile TVMThreadState state;
   TVMThreadID id;
-  volatile unsigned int ticks;
+  volatile int ticks;
   uint8_t *stackBase;
   TVMMemorySize stackSize;
   TVMThreadEntry entry;
@@ -34,13 +44,14 @@ public:
   TVMThreadEntry getEntry();
   TVMThreadIDRef getIDRef();
   TVMThreadPriority getPriority();
-  TVMThreadState getState();
+  volatile TVMThreadState getState();
+  volatile int getTicks();
   void setcd(volatile int calldata);
   void setContext(SMachineContext c);
   void setID(TVMThreadID newID);
   void setPriority(TVMThreadPriority pri);
   void setState(TVMThreadState newstate);
-  void setTicks(volatile unsigned int newticks);
+  void setTicks(volatile int newticks);
 };
 
 

@@ -16,6 +16,7 @@ Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVM
   stackSize = ss;
   entry = entryFunc;
   param = p;
+  ticks = -1;
 }//constructor
 
 
@@ -34,13 +35,17 @@ SMachineContext* Thread::getContextRef()
 
 void Thread::decrementTicks()
 {
+  cout << "Decrement Ticks--" << "ticks: " << getTicks() << "    state: " << getState() << endl;
   ticks--;
   if (ticks <= 0 && state == VM_THREAD_STATE_WAITING)
   {
     state = VM_THREAD_STATE_READY;
-    //insert in correct ready queue here
-    ticks = 0;
+    readyQ[priority]->push(this);
   }//if no need to be asleep
+  if (ticks < 0)
+  {
+    ticks = 2;
+  }
 }//void Thread::decrementTicks()
 
 /*
@@ -68,10 +73,16 @@ TVMThreadPriority Thread::getPriority()
 }//TVMThreadPriority Thread::getPriority()
 
 
-TVMThreadState Thread::getState()
+volatile TVMThreadState Thread::getState()
 {
   return state;
 }//TVMThreadState Thread::getState()
+
+
+volatile int Thread::getTicks()
+{
+  return ticks;
+}//volatile int Thread::getTicks()
 
 
 void Thread::setcd(volatile int calldata)
@@ -104,9 +115,10 @@ void Thread::setState(TVMThreadState newstate)
 }//void Thread::setState(TVMThreadState newstate)
 
 
-void Thread::setTicks(volatile unsigned int newticks)
+void Thread::setTicks(volatile int newticks)
 {
   ticks = newticks;
-}//void Thread::setTicks(unsigned int newticks)
+  cout << "ticks: " << ticks << "    newticks: " << newticks << endl;
+}//void Thread::setTicks(int newticks)
 
 
