@@ -45,13 +45,13 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   mainThread->setID(nextID);
   nextID++;
   readyQ[mainThread->getPriority()]->push(mainThread);
+  tr = mainThread;
   VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
   MachineInitialize(machinetickms);
   MachineRequestAlarm((tickms*1000), timerISR, NULL);
   MachineEnableSignals();
 
   mainFunc(argc, argv);
-
   VMUnloadModule();
   MachineTerminate();
   delete threads;
@@ -233,7 +233,6 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
   nextID++;
   threads->push_back(t);
   MachineContextCreate(&context, entry, param, (void*) mem, memsize);
-  cout << "pre-segfault\n";
   t->setContext(context);
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
@@ -252,7 +251,6 @@ void fileCallback(void* calldata, int result)
 void timerISR(void*)
 {
 //  Thread *pt;
-  cout << "timer ISR\n";
 
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
@@ -280,16 +278,8 @@ void timerISR(void*)
     tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
     //need to pre-load this Q with the idle process (which just sleeps forever)
   }//if there's nothing in any of the RQs, spin
-/*
-  if (mainThread->getState() == VM_THREAD_STATE_DEAD)
-  {
-    live = false;
-  }//do when mainFunc's state is VM_THREAD_STATE_DEAD (program over)
-  else
-  {
-*/
     MachineContextRestore(tr->getContextRef());
-//    MachineContextSwitch(&(pt->getContext()), &(tr->getContext()));
+//    MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
 //  }//run thread for one tick
 }//Timer ISR: Do Everything!
 
