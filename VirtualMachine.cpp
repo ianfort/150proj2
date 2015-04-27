@@ -16,10 +16,11 @@ extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
 void timerISR(void*);
 void idle(void*);
+void scheduler();
 
 TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
-Thread *tr, *mainThread;
+Thread *tr, *mainThread, *pt, *sched;
 queue<Thread*> *readyQ[NUM_RQS];
 
 
@@ -39,6 +40,7 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
+  sched = new Thread;
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
   mainThread->setState(VM_THREAD_STATE_READY);
@@ -101,6 +103,7 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
   }
   MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
+  MachineContextSwitch(tr->getContextRef(), mainThread->getContextRef());
   if(tr->cd >= 0)
   {
     return VM_STATUS_SUCCESS;
@@ -151,6 +154,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   {
     tr->setState(VM_THREAD_STATE_READY);
     readyQ[tr->getPriority()]->push(tr);
+    MachineContextSwitch(tr->getContextRef(), mainThread->getContextRef());
   }// the current process yields the remainder of its processing quantum to the next ready process of equal priority.
   else if (tick == VM_TIMEOUT_INFINITE)
   {
@@ -160,6 +164,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   {
     tr->setTicks(tick);
     tr->setState(VM_THREAD_STATE_WAITING);
+    MachineContextSwitch(tr->getContextRef(), mainThread->getContextRef());
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadSleep(TVMTick tick)
@@ -250,14 +255,17 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
-//  Thread *pt;
-
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
     (*itr)->decrementTicks();
   }//add one tick passed to every thread
+  scheduler();
+}//Timer ISR: Do Everything!
 
-//  pt = tr;
+
+void scheduler()
+{
+  MachineContextSave(sched->getContextRef());
   if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
   {
     tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
@@ -278,10 +286,8 @@ void timerISR(void*)
     tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
     //need to pre-load this Q with the idle process (which just sleeps forever)
   }//if there's nothing in any of the RQs, spin
-    MachineContextRestore(tr->getContextRef());
-//    MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
-//  }//run thread for one tick
-}//Timer ISR: Do Everything!
+  MachineContextRestore(tr->getContextRef());
+}//void scheduler()
 
 
 void idle(void*)
