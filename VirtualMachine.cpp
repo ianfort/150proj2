@@ -39,9 +39,6 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
-  MachineInitialize(machinetickms);
-  MachineRequestAlarm((tickms*1000), timerISR, NULL);
-  MachineEnableSignals();
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
   mainThread->setState(VM_THREAD_STATE_READY);
@@ -49,6 +46,9 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   nextID++;
   readyQ[mainThread->getPriority()]->push(mainThread);
   VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
+  MachineInitialize(machinetickms);
+  MachineRequestAlarm((tickms*1000), timerISR, NULL);
+  MachineEnableSignals();
 
   mainFunc(argc, argv);
 
@@ -228,12 +228,12 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//INVALID PARAMS, must not be NULL
-  stack<void*> *mem = new stack<void*>;
-  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, entry, param);
+  uint8_t *mem =  new uint8_t[memsize];
+  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, memsize, entry, param);
   nextID++;
   threads->push_back(t);
-//  void MachineContextCreate(SMachineContextRef mcntxref, void (*entry)(void *), void *param, void *stackaddr, size_t stacksize);
   MachineContextCreate(&context, entry, param, (void*) mem, memsize);
+  cout << "pre-segfault\n";
   t->setContext(context);
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
@@ -251,14 +251,15 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
-  Thread *pt;
+//  Thread *pt;
+  cout << "timer ISR\n";
 
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
     (*itr)->decrementTicks();
   }//add one tick passed to every thread
 
-  pt = tr;
+//  pt = tr;
   if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
   {
     tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();

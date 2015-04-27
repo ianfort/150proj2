@@ -3,18 +3,17 @@
 
 Thread::Thread()
 {
+  stackBase = NULL;
 }//default/empty constructor
 
-
-Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid,
-               stack<void*> *ts, const ThreadEntry &entryFunc, void *p)
+Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
+               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p)
 {
-  tStack = NULL;
   priority = pri;
   state = st;
   id = tid;
-  if (ts)
-    tStack = ts;
+  stackBase = sb;
+  stackSize = ss;
   entry = entryFunc;
   param = p;
 }//constructor
@@ -22,9 +21,9 @@ Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVM
 
 Thread::~Thread()
 {
-  if (tStack)
-    delete tStack;
-}//default destructor
+  if (stackBase)
+    delete stackBase;
+}//Default destructor
 
 
 SMachineContext* Thread::getContextRef()

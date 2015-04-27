@@ -3,7 +3,6 @@
 
 #include "VirtualMachine.h"
 #include "Machine.h"
-#include <stack>
 
 using namespace std;
 
@@ -19,14 +18,15 @@ class Thread
   TVMThreadState state;
   TVMThreadID id;
   volatile unsigned int ticks;
-  stack<void*> *tStack;
+  uint8_t *stackBase;
+  TVMMemorySize stackSize;
   TVMThreadEntry entry;
   void *param;
 public:
   volatile int cd; //calldata. YES THIS IS PUBLIC.
   Thread();
-  Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, stack<void*> *ts,
-         const ThreadEntry &entryFunc, void *p);
+  Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
+         TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
   SMachineContext* getContextRef();
   void decrementTicks();
