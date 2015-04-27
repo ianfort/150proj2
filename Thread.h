@@ -31,10 +31,11 @@ public:
   SMachineContext* getContextRef();
   void decrementTicks();
 //  volatile int getcd();
+  TVMThreadEntry getEntry();
   TVMThreadIDRef getIDRef();
   TVMThreadPriority getPriority();
   TVMThreadState getState();
-//  void setcd(volatile int calldata);
+  void setcd(volatile int calldata);
   void setContext(SMachineContext c);
   void setID(TVMThreadID newID);
   void setPriority(TVMThreadPriority pri);

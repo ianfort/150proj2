@@ -51,6 +51,12 @@ volatile int Thread::getcd()
 }//volatile int Thread::getcd()
 */
 
+TVMThreadEntry Thread::getEntry()
+{
+  return entry;
+}//TVMThreadEntry Thread::getEntry()
+
+
 TVMThreadIDRef Thread::getIDRef()
 {
   return &id;
@@ -68,12 +74,12 @@ TVMThreadState Thread::getState()
   return state;
 }//TVMThreadState Thread::getState()
 
-/*
-void setcd(volatile int calldata)
+
+void Thread::setcd(volatile int calldata)
 {
   cd = calldata;
 }//void Thread::setcd(volatile int calldata)
-*/
+
 
 void Thread::setContext(SMachineContext c)
 {

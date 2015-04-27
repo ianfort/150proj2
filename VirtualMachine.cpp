@@ -14,7 +14,8 @@ using namespace std;
 extern "C" TVMMainEntry VMLoadModule(const char *module);
 extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
-void decrementTicks(void*);
+void timerISR(void*);
+void idle(void*);
 
 TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
@@ -25,8 +26,9 @@ queue<Thread*> *readyQ[NUM_RQS];
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
   bool live = true;
-  Thread* mainThread;
+  Thread *mainThread, *pt;
   nextID = 0;
+  TVMThreadID idletid;
 
   TVMMainEntry mainFunc = VMLoadModule(argv[0]);
   if (!mainFunc)
@@ -40,18 +42,20 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
   MachineInitialize(machinetickms);
-  MachineRequestAlarm((tickms*1000), decrementTicks, NULL);
+  MachineRequestAlarm((tickms*1000), timerISR, NULL);
   MachineEnableSignals();
   mainThread = new Thread;
-  mainThread->setPriority(VM_THREAD_PRIORITY_HIGH);
+  mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
   mainThread->setState(VM_THREAD_STATE_READY);
   mainThread->setID(nextID);
-//  mainThread->setEntry(mainFunc);
   nextID++;
   readyQ[mainThread->getPriority()]->push(mainThread);
+  VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
 
   while (live)
   {
+    //timer drops off here
+    pt = tr;
     if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
     {
       tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
@@ -72,14 +76,15 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
       tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
       //need to pre-load this Q with the idle process (which just sleeps forever)
     }//if there's nothing in any of the RQs, spin
-    //save current context
-    //load context of next Thread
-    //run thread for one tick       //mainFunc(argc, argv);
-    //do the next thread
     if (mainThread->getState() == VM_THREAD_STATE_DEAD)
     {
       live = false;
     }//do when mainFunc's state is VM_THREAD_STATE_DEAD (program over)
+    else
+    {
+    //machineContextRestore(thread)
+//    MachineContextSwitch(&(pt->getContext()), &(tr->getContext()));
+    }//run thread for one tick
   }//while loop choosing the correct thread (highest priority non-empty ready queue) and running it
 
   VMUnloadModule();
@@ -129,8 +134,8 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }
-  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)&(tr->cd));
-  while (tr->cd == -739);
+  MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)tr);
+  tr->setState(VM_THREAD_STATE_WAITING);
   if(tr->cd >= 0)
   {
     return VM_STATUS_SUCCESS;
@@ -179,19 +184,18 @@ TVMStatus VMThreadSleep(TVMTick tick)
 {
   if (tick == VM_TIMEOUT_IMMEDIATE)
   {
-    // the current process yields the remainder of its processing quantum to the next ready process of equal priority.
-    //change status from running to ready (NOT WAITING); reinsert at back of correct ready queue
-  }
+    tr->setState(VM_THREAD_STATE_READY);
+    readyQ[tr->getPriority()]->push(tr);
+  }// the current process yields the remainder of its processing quantum to the next ready process of equal priority.
   else if (tick == VM_TIMEOUT_INFINITE)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
-  }
+  }//invalid param
   else
   {
     tr->setTicks(tick);
-    //tr->setState(VM_THREAD_WAITING)
+    tr->setState(VM_THREAD_STATE_WAITING);
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
-
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadSleep(TVMTick tick)
 
@@ -205,6 +209,51 @@ TVMStatus VMThreadID(TVMThreadIDRef threadref)
   threadref = tr->getIDRef();
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadID(TVMThreadIDRef threadref)
+
+
+TVMStatus VMThreadState(TVMThreadID thread, TVMThreadStateRef state)
+{
+  bool found = false;
+  if (!state)
+  {
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+  }//if stateref is a null pointer
+
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    if (*((*itr)->getIDRef()) == thread)
+    {
+      *state = (*itr)->getState();
+      found = true;
+    }//found correct thread
+  }//linear search through threads vector for the thread ID in question
+  if (!found)
+    return VM_STATUS_ERROR_INVALID_ID;
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMThreadState(TVMThreadID thread, TVMThreadStateRef state)
+
+
+TVMStatus VMThreadActivate(TVMThreadID thread)
+{
+  bool found = false;
+  Thread* nt = NULL;
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    if (*((*itr)->getIDRef()) == thread)
+    {
+      nt = *itr;
+      found = true;
+    }//found correct thread
+  }//linear search through threads vector for the thread ID in question
+  if (!found)
+    return VM_STATUS_ERROR_INVALID_ID;
+  if (nt->getState() != VM_THREAD_STATE_DEAD)
+    return VM_STATUS_ERROR_INVALID_STATE;
+  nt->setState(VM_THREAD_STATE_READY);
+  nt->getEntry();
+  readyQ[nt->getPriority()]->push(nt);
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMThreadActivate(TVMThreadID thread)
 
 
 TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
@@ -227,12 +276,15 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
 
 void fileCallback(void* calldata, int result)
 {
-//MachineFile* callback function
-  *(int*)calldata = result;
+  Thread* cbt = (Thread*)calldata;
+  cbt->setcd(result);
+  while (cbt->getState() != VM_THREAD_STATE_WAITING);
+  cbt->setState(VM_THREAD_STATE_READY);
+  readyQ[cbt->getPriority()]->push(cbt);
 }//void fileCallback(void* calldata, int result)
 
 
-void decrementTicks(void*)
+void timerISR(void*)
 {
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
@@ -240,5 +292,10 @@ void decrementTicks(void*)
   }//add one tick passed to every thread
 }//helper function for sleeping
 
+
+void idle(void*)
+{
+  while(1);
+}//idles forever!
 
 
