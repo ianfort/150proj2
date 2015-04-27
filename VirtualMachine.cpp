@@ -19,14 +19,12 @@ void idle(void*);
 
 TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
-Thread* tr;
+Thread *tr, *mainThread;
 queue<Thread*> *readyQ[NUM_RQS];
 
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
-  bool live = true;
-  Thread *mainThread, *pt;
   nextID = 0;
   TVMThreadID idletid;
 
@@ -52,40 +50,7 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   readyQ[mainThread->getPriority()]->push(mainThread);
   VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
 
-  while (live)
-  {
-    //timer drops off here
-    pt = tr;
-    if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
-    {
-      tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
-      readyQ[VM_THREAD_PRIORITY_HIGH]->pop();
-    }//if there's anything in hi-pri, run it
-    else if (!readyQ[VM_THREAD_PRIORITY_NORMAL]->empty())
-    {
-      tr = readyQ[VM_THREAD_PRIORITY_NORMAL]->front();
-      readyQ[VM_THREAD_PRIORITY_NORMAL]->pop();
-    }//if there's anything in med-pri, run it
-    else if (!readyQ[VM_THREAD_PRIORITY_LOW]->empty())
-    {
-      tr = readyQ[VM_THREAD_PRIORITY_LOW]->front();
-      readyQ[VM_THREAD_PRIORITY_LOW]->pop();
-    }//if there's anything in low-pri, run it
-    else
-    {
-      tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
-      //need to pre-load this Q with the idle process (which just sleeps forever)
-    }//if there's nothing in any of the RQs, spin
-    if (mainThread->getState() == VM_THREAD_STATE_DEAD)
-    {
-      live = false;
-    }//do when mainFunc's state is VM_THREAD_STATE_DEAD (program over)
-    else
-    {
-    //machineContextRestore(thread)
-//    MachineContextSwitch(&(pt->getContext()), &(tr->getContext()));
-    }//run thread for one tick
-  }//while loop choosing the correct thread (highest priority non-empty ready queue) and running it
+  mainFunc(argc, argv);
 
   VMUnloadModule();
   MachineTerminate();
@@ -286,11 +251,46 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
+  Thread *pt;
+
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
     (*itr)->decrementTicks();
   }//add one tick passed to every thread
-}//helper function for sleeping
+
+  pt = tr;
+  if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
+  {
+    tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
+    readyQ[VM_THREAD_PRIORITY_HIGH]->pop();
+  }//if there's anything in hi-pri, run it
+  else if (!readyQ[VM_THREAD_PRIORITY_NORMAL]->empty())
+  {
+    tr = readyQ[VM_THREAD_PRIORITY_NORMAL]->front();
+    readyQ[VM_THREAD_PRIORITY_NORMAL]->pop();
+  }//if there's anything in med-pri, run it
+  else if (!readyQ[VM_THREAD_PRIORITY_LOW]->empty())
+  {
+    tr = readyQ[VM_THREAD_PRIORITY_LOW]->front();
+    readyQ[VM_THREAD_PRIORITY_LOW]->pop();
+  }//if there's anything in low-pri, run it
+  else
+  {
+    tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
+    //need to pre-load this Q with the idle process (which just sleeps forever)
+  }//if there's nothing in any of the RQs, spin
+/*
+  if (mainThread->getState() == VM_THREAD_STATE_DEAD)
+  {
+    live = false;
+  }//do when mainFunc's state is VM_THREAD_STATE_DEAD (program over)
+  else
+  {
+*/
+    MachineContextRestore(tr->getContextRef());
+//    MachineContextSwitch(&(pt->getContext()), &(tr->getContext()));
+//  }//run thread for one tick
+}//Timer ISR: Do Everything!
 
 
 void idle(void*)
