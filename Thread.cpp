@@ -35,7 +35,6 @@ SMachineContext* Thread::getContextRef()
 
 void Thread::decrementTicks()
 {
-  cout << "Decrement Ticks--" << "ticks: " << getTicks() << "    state: " << getState() << endl;
   ticks--;
   if (ticks <= 0 && state == VM_THREAD_STATE_WAITING)
   {
@@ -118,7 +117,6 @@ void Thread::setState(TVMThreadState newstate)
 void Thread::setTicks(volatile int newticks)
 {
   ticks = newticks;
-  cout << "ticks: " << ticks << "    newticks: " << newticks << endl;
 }//void Thread::setTicks(int newticks)
 
 

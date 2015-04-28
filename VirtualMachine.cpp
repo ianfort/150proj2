@@ -159,9 +159,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   {
     tr->setTicks(tick);
     tr->setState(VM_THREAD_STATE_WAITING);
-    cout << "ticks: " << tr->getTicks() << "    state: " << tr->getState() << endl;
     while (tr->getState() == VM_THREAD_STATE_WAITING);
-    cout << "ticks: " << tr->getTicks() << "    state: " << tr->getState() << endl;
     //MachineContextSwitch(tr->getContextRef(), mainThread->getContextRef());
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
   return VM_STATUS_SUCCESS;
@@ -246,7 +244,6 @@ void fileCallback(void* calldata, int result)
   Thread* cbt = (Thread*)calldata;
   cbt->setcd(result);
   while (cbt->getState() != VM_THREAD_STATE_WAITING);
-  cout << "cbt" << endl;
   cbt->setState(VM_THREAD_STATE_READY);
   readyQ[cbt->getPriority()]->push(cbt);
 }//void fileCallback(void* calldata, int result)
@@ -254,19 +251,13 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
-  MachineSuspendSignals(&sigs);
-  cout << "ISR Before For--" << "ticks: " << tr->getTicks() << "    state: " << tr->getState() << endl;
+  MachineResumeSignals(&sigs);
+//  MachineSuspendSignals(&sigs);
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
-    cout << (int)*itr << endl;
-    cout << (int)tr << endl;
-    cout << "ISR During For Before Operation--" << "ticks: " << (*itr)->getTicks() << "    state: " << (*itr)->getState() << endl;
     (*itr)->decrementTicks();
-    cout << "ISR During For After Operation--" << "ticks: " << (*itr)->getTicks() << "    state: " << (*itr)->getState() << endl;
   }//add one tick passed to every thread
-  cout << "ISR After For Before Operation--" << "ticks: " << tr->getTicks() << "    state: " << tr->getState() << endl;
   scheduler();
-  cout << "ISR After For After Operation--" << "ticks: " << tr->getTicks() << "    state: " << tr->getState() << endl;
   MachineResumeSignals(&sigs);
 }//Timer ISR: Do Everything!
 
@@ -274,6 +265,7 @@ void timerISR(void*)
 void scheduler()
 {
 //  MachineContextSave(sched->getContextRef());
+  pt = tr;
   if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
   {
     tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
@@ -294,6 +286,7 @@ void scheduler()
     tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
     //need to pre-load this Q with the idle process (which just sleeps forever)
   }//if there's nothing in any of the RQs, spin
+  MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
 //  MachineContextRestore(tr->getContextRef());
 }//void scheduler()
 
