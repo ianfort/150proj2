@@ -57,31 +57,31 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 
 TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescriptor)
 {
-  tr->cd = -18; //impossible to have a negative file descriptor
+  tr->setcd(-18); //impossible to have a negative file descriptor
   if (filename == NULL || filedescriptor == NULL)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//need to have a filename and a place to put the FD
-  MachineFileOpen(filename, flags, mode, fileCallback, (void*)&(tr->cd));
+  MachineFileOpen(filename, flags, mode, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
   while (tr->getState() == VM_THREAD_STATE_WAITING);
-  if((tr->cd) < 0)
+  if(tr->getcd() < 0)
   {
     return VM_STATUS_FAILURE;
   }//if invalid FD
-  *filedescriptor = tr->cd;
+  *filedescriptor = tr->getcd();
   return VM_STATUS_SUCCESS;
 } // VMFileOpen
 
 
 TVMStatus VMFileClose(int filedescriptor)
 {
-  tr->cd = 1;
+  tr->setcd(1);
   // Make thread wait here.
-  MachineFileClose(filedescriptor, fileCallback, (void*)&(tr->cd));
-  while (tr->cd > 0); //wait until data has been altered
-  // Change thread state to Stop waiting.
-  if (tr->cd < 0)
+  MachineFileClose(filedescriptor, fileCallback, (void*)tr);
+  tr->setState(VM_THREAD_STATE_WAITING);
+  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  if (tr->getcd() < 0)
   {
     return VM_STATUS_FAILURE;
   }//negative result is a failure
@@ -91,7 +91,7 @@ TVMStatus VMFileClose(int filedescriptor)
 
 TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
 {
-  tr->cd = -739;
+  tr->setcd(-739);
   if (!data || !length)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
@@ -99,27 +99,25 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
   MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
   while (tr->getState() == VM_THREAD_STATE_WAITING);
-  if(tr->cd >= 0)
+  if(tr->getcd() < 0)
   {
-    return VM_STATUS_SUCCESS;
+    return VM_STATUS_FAILURE;
   }//if a non-negative number of bytes written
-  return VM_STATUS_FAILURE;
+  return VM_STATUS_SUCCESS;
 } // VMFileWrite
 
 
 TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 {
-  // void MachineFileSeek(int fd, int offset, int whence, TMachineFileCallback callback, void *calldata);
-  tr->cd = -728;
-  // Make thread wait
-  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)&(tr->cd));
-  while (tr->cd == -728);
+  tr->setcd(-728);
+  MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)tr);
+  tr->setState(VM_THREAD_STATE_WAITING);
+  while (tr->getState() == VM_THREAD_STATE_WAITING);
   if (newoffset)
   {
-    *newoffset = tr->cd;
+    *newoffset = tr->getcd();
   }
-  //make thread stop waiting
-  if (tr->cd < 0)
+  if (tr->getcd() < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
@@ -127,17 +125,14 @@ TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
 
 TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 {
-  tr->cd = -728;
-
+  tr->setcd(-728);
   if (!data || !length)
     return VM_STATUS_ERROR_INVALID_PARAMETER;
-  // Make thread wait
-  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)&(tr->cd));
-  while (tr->cd == -728);
-  *length = tr->cd;
-  //make thread stop waiting
-
-  if (tr->cd < 0)
+  MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)tr);
+  tr->setState(VM_THREAD_STATE_WAITING);
+  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  *length = tr->getcd();
+  if (tr->getcd() < 0)
     return VM_STATUS_FAILURE;
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)

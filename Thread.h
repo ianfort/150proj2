@@ -32,15 +32,15 @@ class Thread
   TVMMemorySize stackSize;
   TVMThreadEntry entry;
   void *param;
+  volatile int cd; //calldata
 public:
-  volatile int cd; //calldata. YES THIS IS PUBLIC.
   Thread();
   Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
          TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
   SMachineContext* getContextRef();
   void decrementTicks();
-//  volatile int getcd();
+  volatile int getcd();
   TVMThreadEntry getEntry();
   TVMThreadIDRef getIDRef();
   TVMThreadPriority getPriority();

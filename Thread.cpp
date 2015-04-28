@@ -47,12 +47,12 @@ void Thread::decrementTicks()
   }
 }//void Thread::decrementTicks()
 
-/*
+
 volatile int Thread::getcd()
 {
   return cd;
 }//volatile int Thread::getcd()
-*/
+
 
 TVMThreadEntry Thread::getEntry()
 {
