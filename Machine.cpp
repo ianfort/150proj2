@@ -333,6 +333,13 @@ void MachineInitialize(int timeout){
                 
                 MachinePendingRequest = false;
             }
+            else if(0 == Result){
+                if(0 > kill(MachineData.DParentPID, 0)){
+                    if(ESRCH == errno){
+                        Terminated = true;
+                    }
+                }
+            }
             for(size_t Index = 0; Index < PollFDs.size(); Index++){
                 if(PollFDs[Index].revents){
                     for(size_t ReadIndex = 0; ReadIndex < PendingReads.size(); ReadIndex++){
