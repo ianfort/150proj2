@@ -17,6 +17,7 @@ Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVM
   entry = entryFunc;
   param = p;
   ticks = -1;
+  cd = -5;
 }//constructor
 
 

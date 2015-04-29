@@ -64,7 +64,7 @@ TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescrip
   }//need to have a filename and a place to put the FD
   MachineFileOpen(filename, flags, mode, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
-  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  scheduler();
   if(tr->getcd() < 0)
   {
     return VM_STATUS_FAILURE;
@@ -80,7 +80,7 @@ TVMStatus VMFileClose(int filedescriptor)
   // Make thread wait here.
   MachineFileClose(filedescriptor, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
-  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  scheduler();
   if (tr->getcd() < 0)
   {
     return VM_STATUS_FAILURE;
@@ -98,7 +98,7 @@ TVMStatus VMFileWrite(int filedescriptor, void *data, int *length)
   }//not allowed to have NULL pointers for where we put the data
   MachineFileWrite(filedescriptor, data, *length, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
-  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  scheduler();
   if(tr->getcd() < 0)
   {
     return VM_STATUS_FAILURE;
@@ -112,7 +112,7 @@ TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset)
   tr->setcd(-728);
   MachineFileSeek(filedescriptor, offset, whence, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
-  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  scheduler();
   if (newoffset)
   {
     *newoffset = tr->getcd();
@@ -130,7 +130,7 @@ TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   MachineFileRead(filedescriptor, data, *length, fileCallback, (void*)tr);
   tr->setState(VM_THREAD_STATE_WAITING);
-  while (tr->getState() == VM_THREAD_STATE_WAITING);
+  scheduler();
   *length = tr->getcd();
   if (tr->getcd() < 0)
     return VM_STATUS_FAILURE;
@@ -144,7 +144,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   {
     tr->setState(VM_THREAD_STATE_READY);
     readyQ[tr->getPriority()]->push(tr);
-    //need a spinlock here
+    scheduler();
   }// the current process yields the remainder of its processing quantum to the next ready process of equal priority.
   else if (tick == VM_TIMEOUT_INFINITE)
   {
@@ -154,7 +154,7 @@ TVMStatus VMThreadSleep(TVMTick tick)
   {
     tr->setTicks(tick);
     tr->setState(VM_THREAD_STATE_WAITING);
-    while (tr->getState() == VM_THREAD_STATE_WAITING);
+    scheduler();
   } //does nothing while the number of ticks that have passed since entering this function is less than the number to sleep on
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadSleep(TVMTick tick)
@@ -259,7 +259,11 @@ void timerISR(void*)
 void scheduler()
 {
   pt = tr;
-  readyQ[pt->getPriority()]->push(pt);  
+  if (pt->getState() == VM_THREAD_STATE_RUNNING)
+  {
+    pt->setState(VM_THREAD_STATE_READY);
+    readyQ[pt->getPriority()]->push(pt);
+  }//return non-blocked old thread to ready queues
   if (!readyQ[VM_THREAD_PRIORITY_HIGH]->empty())
   {
     tr = readyQ[VM_THREAD_PRIORITY_HIGH]->front();
@@ -280,6 +284,7 @@ void scheduler()
     tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
     readyQ[VM_THREAD_PRIORITY_LOW]->pop();
   }//if there's nothing in any of the RQs, spin with the idle process
+  tr->setState(VM_THREAD_STATE_RUNNING);
   MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
 }//void scheduler()
 
