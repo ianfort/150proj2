@@ -1,17 +1,22 @@
 #include "Thread.h"
 
 
+TVMThreadID Thread::nextID = 0;
+
 Thread::Thread()
 {
+  id = nextID;
+  nextID++;
   stackBase = NULL;
 }//default/empty constructor
 
-Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
-               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p)
+Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid,
+               uint8_t *sb, TVMMemorySize ss, const ThreadEntry &entryFunc, void *p)
 {
+  Thread();
   priority = pri;
   state = st;
-  id = tid;
+  *tid = id;
   stackBase = sb;
   stackSize = ss;
   entry = entryFunc;

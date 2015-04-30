@@ -10,15 +10,13 @@ void timerISR(void*);
 void idle(void*);
 void scheduler();
 
-TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
-Thread *tr, *mainThread, *pt, *sched;
+Thread *tr, *mainThread, *pt;
 queue<Thread*> *readyQ[NUM_RQS];
 sigset_t sigs;
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
-  nextID = 0;
   TVMThreadID idletid;
 
   TVMMainEntry mainFunc = VMLoadModule(argv[0]);
@@ -32,12 +30,9 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
-  sched = new Thread;
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
   mainThread->setState(VM_THREAD_STATE_RUNNING);
-  mainThread->setID(nextID);
-  nextID++;
   threads->push_back(mainThread);
   tr = mainThread;
   VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
@@ -51,7 +46,7 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   MachineTerminate();
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
-    if ((*itr))
+    if (*itr)
     {
       delete *itr;
     }//delete contents of threads
@@ -229,13 +224,52 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//INVALID PARAMS, must not be NULL
   uint8_t *mem =  new uint8_t[memsize];
-  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, memsize, entry, param);
-  nextID++;
+  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, tid, mem, memsize, entry, param);
   threads->push_back(t);
   MachineContextCreate(&context, entry, param, (void*) mem, memsize);
   t->setContext(context);
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid)
+
+
+TVMStatus VMThreadDelete(TVMThreadID thread)
+{
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMThreadDelete(TVMThreadID thread)
+
+
+TVMStatus VMThreadTerminate(TVMThreadID thread)
+{
+  Thread *term = NULL, *temp;
+  int target;
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    if (*((*itr)->getIDRef()) == thread)
+      term = *itr;
+  }//search through threads to find correct Thread* to update
+  if (!term)
+  {
+    scheduler();
+    return VM_STATUS_ERROR_INVALID_ID;
+  }//term not found in threads
+  if (term->getState() == VM_THREAD_STATE_DEAD)
+  {
+    scheduler();
+    return VM_STATUS_ERROR_INVALID_STATE;
+  }//requested thread already dead
+  term->setState(VM_THREAD_STATE_DEAD);
+  //release all of term's mutexes here
+  target = readyQ[term->getPriority()]->size();
+  for (int i = 0; i < target; i++)
+  {
+    temp = readyQ[term->getPriority()]->front();
+    readyQ[term->getPriority()]->pop();
+    if (temp != term)
+      readyQ[term->getPriority()]->push(temp);
+  }//cycle the relevant ready queue completely to find and flush the terminated thread from the ready queue
+  scheduler();
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMThreadTerminate(TVMThreadID thread)
 
 
 void fileCallback(void* calldata, int result)

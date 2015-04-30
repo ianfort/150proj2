@@ -23,6 +23,7 @@ typedef void (*ThreadEntry)(void *param);
 
 class Thread
 {
+  static TVMThreadID nextID; //increment every time a thread is created. Decrement never.
   SMachineContext context;
   TVMThreadPriority priority;
   volatile TVMThreadState state;
@@ -35,8 +36,7 @@ class Thread
   volatile int cd; //calldata
 public:
   Thread();
-  Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
-         TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
+  Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb, TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
   SMachineContext* getContextRef();
   void decrementTicks();
