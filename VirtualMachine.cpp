@@ -50,6 +50,13 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   mainFunc(argc, argv);
   VMUnloadModule();
   MachineTerminate();
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    if ((*itr))
+    {
+      delete *itr;
+    }//delete contents of threads
+  }//for all threads
   delete threads;
   return VM_STATUS_SUCCESS;
 } //VMStart
@@ -178,7 +185,6 @@ TVMStatus VMThreadState(TVMThreadID thread, TVMThreadStateRef state)
   {
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//if stateref is a null pointer
-
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
     if (*((*itr)->getIDRef()) == thread)
@@ -245,14 +251,14 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
-  MachineResumeSignals(&sigs);
-//  MachineSuspendSignals(&sigs);
+//  MachineResumeSignals(&sigs);
+  MachineSuspendSignals(&sigs);
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
     (*itr)->decrementTicks();
   }//add one tick passed to every thread
-  scheduler();
   MachineResumeSignals(&sigs);
+  scheduler();
 }//Timer ISR: Do Everything!
 
 
@@ -282,7 +288,7 @@ void scheduler()
   else
   {
     tr = readyQ[VM_THREAD_PRIORITY_NIL]->front();
-    readyQ[VM_THREAD_PRIORITY_LOW]->pop();
+    readyQ[VM_THREAD_PRIORITY_NIL]->pop();
   }//if there's nothing in any of the RQs, spin with the idle process
   tr->setState(VM_THREAD_STATE_RUNNING);
   MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
