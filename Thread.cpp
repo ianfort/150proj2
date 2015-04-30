@@ -37,14 +37,14 @@ SMachineContext* Thread::getContextRef()
 void Thread::decrementTicks()
 {
   ticks--;
-  if (ticks <= 0 && state == VM_THREAD_STATE_WAITING)
+  if (ticks == 0 && state == VM_THREAD_STATE_WAITING)
   {
     state = VM_THREAD_STATE_READY;
     readyQ[priority]->push(this);
   }//if no need to be asleep
   if (ticks < 0)
   {
-    ticks = 2;
+    ticks = -5;
   }
 }//void Thread::decrementTicks()
 

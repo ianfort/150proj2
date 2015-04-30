@@ -35,10 +35,9 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   sched = new Thread;
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
-  mainThread->setState(VM_THREAD_STATE_READY);
+  mainThread->setState(VM_THREAD_STATE_RUNNING);
   mainThread->setID(nextID);
   nextID++;
-  readyQ[mainThread->getPriority()]->push(mainThread);
   threads->push_back(mainThread);
   tr = mainThread;
   VMThreadCreate(idle, NULL, 0x100000, VM_THREAD_PRIORITY_NIL, &idletid);
