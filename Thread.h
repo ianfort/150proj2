@@ -7,6 +7,7 @@
 #include "Machine.h"
 #include <iostream>
 #include <queue>
+#include "Mutex.h"
 
 using namespace std;
 
