@@ -12,7 +12,7 @@ Thread::Thread()
 }//default/empty constructor
 
 Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb,
-               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p, vector<Mutex*> *hMut vector<Mutex*> *hMut)
+               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p) //, vector<Mutex*> *hMut vector<Mutex*> *hMut)
 {
   priority = pri;
   state = st;
@@ -23,7 +23,7 @@ Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThread
   param = p;
   ticks = -1;
   cd = -5;
-  heldMutex = hMut;
+  heldMutex = new vector<Mutex*>;
 }//constructor
 
 
@@ -31,6 +31,7 @@ Thread::~Thread()
 {
   if (stackBase)
     delete stackBase;
+  delete vector<Mutex*>;
 }//Default destructor
 
 
