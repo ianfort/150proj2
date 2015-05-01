@@ -1,14 +1,18 @@
 #include "Thread.h"
 
 
+TVMThreadID Thread::nextID = 0;
+
 Thread::Thread()
 {
+  id = nextID;
+  nextID++;
   stackBase = NULL;
   heldMutex = NULL;
 }//default/empty constructor
 
-Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
-               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p, vector<Mutex*> *hMut)
+Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb,
+               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p, vector<Mutex*> *hMut vector<Mutex*> *hMut)
 {
   priority = pri;
   state = st;
@@ -39,14 +43,14 @@ SMachineContext* Thread::getContextRef()
 void Thread::decrementTicks()
 {
   ticks--;
-  if (ticks <= 0 && state == VM_THREAD_STATE_WAITING)
+  if (ticks == 0 && state == VM_THREAD_STATE_WAITING)
   {
     state = VM_THREAD_STATE_READY;
     readyQ[priority]->push(this);
   }//if no need to be asleep
   if (ticks < 0)
   {
-    ticks = 2;
+    ticks = -5;
   }
 }//void Thread::decrementTicks()
 
