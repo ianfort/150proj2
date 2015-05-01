@@ -32,7 +32,6 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     readyQ[i] = new queue<Thread*>;
   }//allocate memory for ready queues
-  sched = new Thread;
   mainThread = new Thread;
   mainThread->setPriority(VM_THREAD_PRIORITY_NORMAL);
   mainThread->setState(VM_THREAD_STATE_RUNNING);

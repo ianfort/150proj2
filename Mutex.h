@@ -2,6 +2,7 @@
 #define MUTEX_H
 
 //#include "Thread.h"
+#include "VirtualMachine.h"
 #include <queue>
 
 // typedef unsigned int TVMMutexID, *TVMMutexIDRef;
