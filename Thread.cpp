@@ -41,7 +41,7 @@ bool Thread::acquireMutex(Mutex* mtx)
   {
     heldMutex->push_back(mtx);
     return true;
-  }//if mutex not already held, acquire it
+  }//if mutex not already held by self, acquire it
   return false;
 }//bool Thread::acquireMutex(Mutex* mtx)
 
@@ -65,7 +65,7 @@ Mutex* Thread::findMutex(TVMMutexID id)
 {
   for (vector<Mutex*>::iterator itr = heldMutex->begin(); itr != heldMutex->end(); itr++)
   {
-    if ( (*itr)->getID() == id )
+    if ((*itr)->getID() == id)
     {
       return *itr;
     }//return ptr to mutex

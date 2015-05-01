@@ -1,4 +1,5 @@
 #include "Thread.h"
+#include "Tibia.h"
 
 
 using namespace std;
@@ -7,8 +8,9 @@ extern "C" TVMMainEntry VMLoadModule(const char *module);
 extern "C" void VMUnloadModule(void);
 void fileCallback(void* calldata, int result);
 void timerISR(void*);
-void idle(void*);
 void scheduler();
+void skeleton(void* tibia);
+void idle(void*);
 
 TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
@@ -273,7 +275,8 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
   uint8_t *mem =  new uint8_t[memsize];
   Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, tid, mem, memsize, entry, param);
   threads->push_back(t);
-  MachineContextCreate(&context, entry, param, (void*) mem, memsize);
+  Tibia *tibia = new Tibia(entry, param);
+  MachineContextCreate(&context, skeleton, (void*)tibia, (void*)mem, memsize);
   t->setContext(context);
   MachineResumeSignals(&sigs);
   return VM_STATUS_SUCCESS;
@@ -358,7 +361,6 @@ void fileCallback(void* calldata, int result)
 
 void timerISR(void*)
 {
-//  MachineResumeSignals(&sigs);
   MachineSuspendSignals(&sigs);
   for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
   {
@@ -401,6 +403,14 @@ void scheduler()
   MachineResumeSignals(&sigs);
   MachineContextSwitch(pt->getContextRef(), tr->getContextRef());
 }//void scheduler()
+
+
+void skeleton(void *tibia)
+{
+  TVMThreadEntry func = ((Tibia*)tibia)->getEntry();
+  func(((Tibia*)tibia)->getParam());
+  VMThreadTerminate(*(tr->getIDRef()));
+}//3spoopy5me
 
 
 void idle(void*)
