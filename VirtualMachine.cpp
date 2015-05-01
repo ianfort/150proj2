@@ -230,7 +230,7 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
     return VM_STATUS_ERROR_INVALID_PARAMETER;
   }//INVALID PARAMS, must not be NULL
   uint8_t *mem =  new uint8_t[memsize];
-  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, memsize, entry, param);
+  Thread* t = new Thread(prio, VM_THREAD_STATE_DEAD, *tid = nextID, mem, memsize, entry, param, new vector<Mutex*>);
   nextID++;
   threads->push_back(t);
   MachineContextCreate(&context, entry, param, (void*) mem, memsize);

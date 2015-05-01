@@ -33,6 +33,7 @@ class Thread
   TVMThreadEntry entry;
   void *param;
   volatile int cd; //calldata
+  vector<Mutex*> *heldMutex;
 public:
   Thread();
   Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
@@ -52,6 +53,9 @@ public:
   void setPriority(TVMThreadPriority pri);
   void setState(TVMThreadState newstate);
   void setTicks(volatile int newticks);
+  void acquireMutex(Mutex* mtx);
+  Mutex* getMutex(TVMMutexID id);
+  void releaseMutex(TVMMutexID);
 };
 
 

@@ -4,10 +4,11 @@
 Thread::Thread()
 {
   stackBase = NULL;
+  heldMutex = NULL;
 }//default/empty constructor
 
 Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVMThreadID &tid, uint8_t *sb,
-               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p)
+               TVMMemorySize ss, const ThreadEntry &entryFunc, void *p, vector<Mutex*> *hMut)
 {
   priority = pri;
   state = st;
@@ -18,6 +19,7 @@ Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, const TVM
   param = p;
   ticks = -1;
   cd = -5;
+  heldMutex = hMut;
 }//constructor
 
 
@@ -121,3 +123,42 @@ void Thread::setTicks(volatile int newticks)
 }//void Thread::setTicks(int newticks)
 
 
+
+
+
+bool Thread::acquireMutex(Mutex* mtx)
+{
+  if (!getMutex(mtx->getID()))
+  {
+    heldMutex->push_back(mtx);
+    return true;
+  }
+  return false;
+}
+
+
+Mutex* Thread::getMutex(TVMMutexID id)
+{
+  for (vector<Mutex*>::iterator itr = heldMutex->begin() ; itr != heldMutex->end() ; itr++)
+  {
+    if ( (itr*)->getID() == id )
+    {
+      return itr*;
+    }
+  }
+  return NULL;
+}
+
+
+bool releaseMutex(TVMMutexID id)
+{
+  for (vector<Mutex*>::iterator itr = heldMutex->begin() ; itr != heldMutex->end() ; itr++)
+  {
+    if ( (itr*)->getID() == id )
+    {
+      heldMutex->erase(itr);
+      return true;
+    }
+  }
+  return false;
+}
