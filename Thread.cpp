@@ -116,6 +116,20 @@ volatile int Thread::getTicks()
 }//volatile int Thread::getTicks()
 
 
+bool Thread::releaseMutex(TVMMutexID id)
+{
+  for (vector<Mutex*>::iterator itr = heldMutex->begin() ; itr != heldMutex->end() ; itr++)
+  {
+    if ((*itr)->getID() == id)
+    {
+      heldMutex->erase(itr);
+      return true;
+    }//if the mutex is found, release it
+  }//linear search for mutex
+  return false;
+}//bool Thread::releaseMutex(TVMMutexID id)
+
+
 void Thread::setcd(volatile int calldata)
 {
   cd = calldata;
@@ -150,20 +164,6 @@ void Thread::setTicks(volatile int newticks)
 {
   ticks = newticks;
 }//void Thread::setTicks(int newticks)
-
-
-bool Thread::releaseMutex(TVMMutexID id)
-{
-  for (vector<Mutex*>::iterator itr = heldMutex->begin() ; itr != heldMutex->end() ; itr++)
-  {
-    if ((*itr)->getID() == id)
-    {
-      heldMutex->erase(itr);
-      return true;
-    }//if the mutex is found, release it
-  }//linear search for mutex
-  return false;
-}//bool Thread::releaseMutex(TVMMutexID id)
 
 
 

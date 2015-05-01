@@ -371,8 +371,6 @@ void timerISR(void*)
 
 void scheduler()
 {
-  MachineResumeSignals(&sigs);
-  MachineSuspendSignals(&sigs);
   pt = tr;
   if (pt->getState() == VM_THREAD_STATE_RUNNING)
   {
