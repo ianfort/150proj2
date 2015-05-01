@@ -281,6 +281,28 @@ TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsiz
 TVMStatus VMThreadDelete(TVMThreadID thread)
 {
   MachineSuspendSignals(&sigs);
+  Thread *del = NULL;
+  vector<Thread*>::iterator killme;
+  for (vector<Thread*>::iterator itr = threads->begin(); itr != threads->end(); itr++)
+  {
+    if (*((*itr)->getIDRef()) == thread)
+    {
+      del = *itr;
+      killme = itr;
+    }//save the correct itr for later use
+  }//search through threads to find correct Thread* to delete
+  if (!del)
+  {
+    MachineResumeSignals(&sigs);
+    return VM_STATUS_ERROR_INVALID_ID;
+  }//thread ID not found
+  if (del->getState() != VM_THREAD_STATE_DEAD)
+  {
+    MachineResumeSignals(&sigs);
+    return VM_STATUS_ERROR_INVALID_STATE;
+  }//requested thread not dead
+  threads->erase(killme);
+  delete del;
   MachineResumeSignals(&sigs);
   return VM_STATUS_SUCCESS;
 }//TVMStatus VMThreadDelete(TVMThreadID thread)
