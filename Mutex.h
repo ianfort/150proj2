@@ -1,11 +1,12 @@
 #ifndef MUTEX_H
 #define MUTEX_H
 
-#define 
 
-//#include "Thread.h"
+#include "Thread.h"
 #include "VirtualMachine.h"
 #include <queue>
+
+using namespace std;
 
 // typedef unsigned int TVMMutexID, *TVMMutexIDRef;
 
@@ -20,14 +21,14 @@ class Mutex
   Thread* owner;
   // queue<Thread*> *qtex; // Waiting queue for threads trying to acquire this mutex
 public:
-  TVMMutexID getID();
+  Mutex();
+  int acquire(Thread* thrd, TVMTick timeout);
   bool getAvailable();
-  bool acquire(Thread* thrd, TVMTick timeout);
-  bool release();
-
-  void popQTex();
-  void pushQTex();
-  int isInQueue(TVMThreadID id);
+  TVMMutexID getID();
+  Thread* getOwner();
+  bool isInQueue(TVMThreadID id);
+  void release();
+  void waitTimeout(Thread* thrd);
 };
 
 #endif

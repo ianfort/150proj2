@@ -26,6 +26,8 @@ extern queue<Thread*> *readyQ[NUM_RQS];
 
 typedef void (*ThreadEntry)(void *param);
 
+class Mutex;
+
 class Thread
 {
   static TVMThreadID nextID; //increment every time a thread is created. Decrement never.
@@ -62,6 +64,7 @@ public:
   void setPriority(TVMThreadPriority pri);
   void setState(TVMThreadState newstate);
   void setTicks(volatile int newticks);
+  void stopWaiting();
 };
 
 

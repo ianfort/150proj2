@@ -5,14 +5,27 @@ TVMMutexID Mutex::idCounter = 0;
 
 Mutex::Mutex()
 {
+  QTex = new queue<Thread*>;
+  owner = NULL;
   id = idCounter;
   idCounter++;
-}
+}//Mutex::Mutex()
 
 
-TVMMutexID Mutex::getID()
+int Mutex::acquire(Thread* thrd, TVMTick timeout)
 {
-}
+  if (owner)
+  {
+    if (!isInQueue(*(thrd->getIDRef())) && timeout != VM_TIMEOUT_IMMEDIATE)
+    {
+      QTex->push(thrd);
+      return ACQUIRE_WAIT;
+    }
+    return ACQUIRE_UNNECESSARY;
+  }
+  owner = thrd;
+  return ACQUIRE_SUCCESS;
+}//int Mutex::acquire(Thread* thrd, TVMTick timeout)
 
 
 bool Mutex::getAvailable()
@@ -21,54 +34,65 @@ bool Mutex::getAvailable()
   {
     return true;
   }
-
   return false;
-}
+}//bool Mutex::getAvailable()
 
 
-int Mutex::acquire(Thread* thrd, TVMTick timeout)
+TVMMutexID Mutex::getID()
 {
-  // Return value for debugging
+  return id;
+}//TVMMutexID Mutex::getID()
 
-  if (owner)
+
+Thread* Mutex::getOwner()
+{
+  return owner;
+}//Thread* Mutex::getOwner()
+
+
+bool Mutex::isInQueue(TVMThreadID id)
+{
+  Thread* temp;
+  bool found = false;
+  int sz = QTex->size();
+  for (int i = 0; i < sz; i++)
   {
-    if ( !isInQueue(thrd->getID()) && timeout != VM_TIMEOUT_IMMEDIATE)
-    {
-      QTex->push(thrd)
-      return ACQUIRE_WAIT;
-    }
-    return ACQUIRE_UNNECESSARY;
-  }
-  owner = thrd;
-  
-  return ACQUIRE_SUCCESS;
-}
+    temp = QTex->front();
+    QTex->pop();
+    if (*(temp->getIDRef()) == id)
+      found = true;
+    QTex->push(temp);
+  }//cycle the wait queue completely to linear search for a thread's presence
+  return found;
+}//bool isInQueue(TVMThreadID id)
 
 
-bool Mutex::release();
+void Mutex::release()
 {
-  // Return value for debugging
-
-  if (owner)
+  if (!QTex->empty())
+  {
+    owner = QTex->front();
+    owner->stopWaiting();
+    QTex->pop();
+  }
+  else 
   {
     owner = NULL;
-    return true;
   }
+}//void Mutex::release()
 
-  return false;
-}
-
-
-bool isInQueue(TVMThreadID id)
+void Mutex::waitTimeout(Thread* thrd)
 {
-  for (queue<Thread*>::iterator itr = QTex->begin() ; itr != QTex->end() ; itr++)
+  Thread* temp;
+  int sz = QTex->size();
+  for (int i = 0; i < sz; i++)
   {
-    if ( (*itr)->getID() == id )
-    {
-      return true;
-    }
-  }
+    temp = QTex->front();
+    QTex->pop();
+    if (temp != thrd)
+      QTex->push(temp);
+  }//cycle the wait queue completely to find and flush the timeout'd thread from the wait queue
+  thrd->stopWaiting();
+}//void Mutex::waitTimeout(Thread* thrd)
 
-  return false;
-}
 

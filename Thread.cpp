@@ -60,8 +60,8 @@ void Thread::decrementTicks()
     state = VM_THREAD_STATE_READY;
     if (waiting)
     {
-      ;
-    }//remove from mutex wait queue
+      waiting->waitTimeout(this);
+    }//stop waiting on mutex due to TIMEOUT
     readyQ[priority]->push(this);
   }//if no need to be asleep
   if (ticks < 0)
@@ -132,7 +132,7 @@ bool Thread::releaseMutex(TVMMutexID id)
   {
     if ((*itr)->getID() == id)
     {
-      itr->release();
+      (*itr)->release();
       heldMutex->erase(itr);
       return true;
     }//if the mutex is found, release it
@@ -175,6 +175,12 @@ void Thread::setTicks(volatile int newticks)
 {
   ticks = newticks;
 }//void Thread::setTicks(int newticks)
+
+
+void Thread::stopWaiting()
+{
+  waiting = NULL;
+}//void Thread::stopWaiting()
 
 
 
