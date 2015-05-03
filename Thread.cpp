@@ -1,6 +1,5 @@
 #include "Thread.h"
 
-
 TVMThreadID Thread::nextID = 0;
 
 Thread::Thread()
@@ -35,14 +34,19 @@ Thread::~Thread()
 }//Default destructor
 
 
-bool Thread::acquireMutex(Mutex* mtx)
+int Thread::acquireMutex(Mutex* mtx)
 {
-  if (!findMutex(mtx->getID()))
+  if (!findMutex(mtx->getID()) )
   {
-    heldMutex->push_back(mtx);
-    return true;
-  }//if mutex not already held by self, acquire it
-  return false;
+    if ( mtx->getAvailable() )
+    {
+      mtx->acquire();
+      heldMutex->push_back(mtx);
+      return ACQUIRE_SUCCESS;
+    }
+    return ACQUIRE_UNAVAILABLE;
+  } // !findMutex(mtx->getID())
+  return ACQUIRE_UNNECESSARY;
 }//bool Thread::acquireMutex(Mutex* mtx)
 
 
@@ -122,6 +126,7 @@ bool Thread::releaseMutex(TVMMutexID id)
   {
     if ((*itr)->getID() == id)
     {
+      itr->release();
       heldMutex->erase(itr);
       return true;
     }//if the mutex is found, release it

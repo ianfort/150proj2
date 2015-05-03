@@ -1,6 +1,10 @@
 #ifndef THREAD_H
 #define THREAD_H
 
+#define ACQUIRE_SUCCESS 0
+#define ACQUIRE_UNAVAILABLE 1
+#define ACQUIRE_UNNECESSARY (-1)
+
 #include <unistd.h>
 #include <vector>
 #include "VirtualMachine.h"
@@ -40,7 +44,7 @@ public:
   Thread();
   Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb, TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
-  bool acquireMutex(Mutex* mtx);
+  int acquireMutex(Mutex* mtx);
   void decrementTicks();
   Mutex* findMutex(TVMMutexID id);
   volatile int getcd();

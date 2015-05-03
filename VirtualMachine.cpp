@@ -1,5 +1,7 @@
 #include "Thread.h"
 #include "Tibia.h"
+#include "Mutex.h"
+
 
 
 using namespace std;
@@ -17,6 +19,7 @@ vector<Thread*> *threads;
 Thread *tr, *mainThread, *pt;
 queue<Thread*> *readyQ[NUM_RQS];
 sigset_t sigs;
+vector<Mutex*> *mutexes;
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
@@ -28,8 +31,9 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
   {
     return VM_STATUS_FAILURE;
   }//if mainFunc doesn't load, kill yourself
-
+  
   threads = new vector<Thread*>;
+  mutexes = new vector<Mutex*>;
   for (int i = 0; i < NUM_RQS; i++)
   {
     readyQ[i] = new queue<Thread*>;
@@ -55,7 +59,17 @@ TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
       delete *itr;
     }//delete contents of threads
   }//for all threads
+  
+  for (vector<Mutex*>::iterator itr = mutexes->begin(); itr != mutexes->end(); itr++)
+  {
+    if (*itr)
+    {
+      delete *itr;
+    }//delete contents of threads
+  }//for all threads
+
   delete threads;
+  delete mutexes;
   return VM_STATUS_SUCCESS;
 } //VMStart
 
