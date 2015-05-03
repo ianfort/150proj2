@@ -1,6 +1,8 @@
 #ifndef MUTEX_H
 #define MUTEX_H
 
+#define 
+
 //#include "Thread.h"
 #include "VirtualMachine.h"
 #include <queue>
@@ -20,12 +22,12 @@ class Mutex
 public:
   TVMMutexID getID();
   bool getAvailable();
-  bool acquire();
+  bool acquire(Thread* thrd, TVMTick timeout);
   bool release();
 
-  void popQTex()
-  void pushQTex()
-  void 
+  void popQTex();
+  void pushQTex();
+  int isInQueue(TVMThreadID id);
 };
 
 #endif

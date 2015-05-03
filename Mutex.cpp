@@ -2,6 +2,14 @@
 
 TVMMutexID Mutex::idCounter = 0;
 
+
+Mutex::Mutex()
+{
+  id = idCounter;
+  idCounter++;
+}
+
+
 TVMMutexID Mutex::getID()
 {
 }
@@ -18,17 +26,22 @@ bool Mutex::getAvailable()
 }
 
 
-bool Mutex::acquire()
+int Mutex::acquire(Thread* thrd, TVMTick timeout)
 {
   // Return value for debugging
 
-  if (!available)
+  if (owner)
   {
-    available = true;
-    return true;
+    if ( !isInQueue(thrd->getID()) && timeout != VM_TIMEOUT_IMMEDIATE)
+    {
+      QTex->push(thrd)
+      return ACQUIRE_WAIT;
+    }
+    return ACQUIRE_UNNECESSARY;
   }
-
-    return false;
+  owner = thrd;
+  
+  return ACQUIRE_SUCCESS;
 }
 
 
@@ -36,10 +49,24 @@ bool Mutex::release();
 {
   // Return value for debugging
 
-  if (available)
+  if (owner)
   {
-    available = false;
+    owner = NULL;
     return true;
+  }
+
+  return false;
+}
+
+
+bool isInQueue(TVMThreadID id)
+{
+  for (queue<Thread*>::iterator itr = QTex->begin() ; itr != QTex->end() ; itr++)
+  {
+    if ( (*itr)->getID() == id )
+    {
+      return true;
+    }
   }
 
   return false;

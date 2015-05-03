@@ -2,7 +2,7 @@
 #define THREAD_H
 
 #define ACQUIRE_SUCCESS 0
-#define ACQUIRE_UNAVAILABLE 1
+#define ACQUIRE_WAIT 1
 #define ACQUIRE_UNNECESSARY (-1)
 
 #include <unistd.h>
@@ -40,11 +40,12 @@ class Thread
   void *param;
   volatile int cd; //calldata
   vector<Mutex*> *heldMutex;
+  Mutex* waiting;
 public:
   Thread();
   Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb, TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
-  int acquireMutex(Mutex* mtx);
+  int acquireMutex(Mutex* mtx, TVMTick timeout);
   void decrementTicks();
   Mutex* findMutex(TVMMutexID id);
   volatile int getcd();

@@ -8,6 +8,7 @@ Thread::Thread()
   nextID++;
   stackBase = NULL;
   heldMutex = new vector<Mutex*>;
+  waiting = NULL;
 }//default/empty constructor
 
 Thread::Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb,
@@ -34,17 +35,18 @@ Thread::~Thread()
 }//Default destructor
 
 
-int Thread::acquireMutex(Mutex* mtx)
+int Thread::acquireMutex(Mutex* mtx, TVMTick timeout)
 {
+  waiting = NULL;
   if (!findMutex(mtx->getID()) )
   {
-    if ( mtx->getAvailable() )
+    if (mtx->acquire(this, timeout) == ACQUIRE_SUCCESS)
     {
-      mtx->acquire();
       heldMutex->push_back(mtx);
       return ACQUIRE_SUCCESS;
     }
-    return ACQUIRE_UNAVAILABLE;
+    waiting = mtx;
+    return ACQUIRE_WAIT;
   } // !findMutex(mtx->getID())
   return ACQUIRE_UNNECESSARY;
 }//bool Thread::acquireMutex(Mutex* mtx)
@@ -56,6 +58,10 @@ void Thread::decrementTicks()
   if (ticks == 0 && state == VM_THREAD_STATE_WAITING)
   {
     state = VM_THREAD_STATE_READY;
+    if (waiting)
+    {
+      ;
+    }//remove from mutex wait queue
     readyQ[priority]->push(this);
   }//if no need to be asleep
   if (ticks < 0)

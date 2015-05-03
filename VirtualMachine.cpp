@@ -181,6 +181,63 @@ TVMStatus VMFileRead(int filedescriptor, void *data, int *length)
 }//TVMStatus VMFileseek(int filedescriptor, int offset, int whence, int *newoffset)
 
 
+TVMStatus VMMutexCreate(TVMMutexIDRef mutexref)
+{
+  MachineSuspendSignals(&sigs);
+  if (!mutexref)
+  {
+    MachineResumeSignals(&sigs);
+    return VM_STATUS_ERROR_INVALID_PARAMETER;
+  }
+  Mutex* mtx = new Mutex;
+  mutexref = mtx->getID();
+  mutexes->push_back(mtx);
+  MachineResumeSignals(&sigs);
+  return VM_STATUS_SUCCESS;
+}//TVMSTATUS VMMutexCreate(TVMMutexIDRef mutexref)
+
+
+TVMStatus VMMutexAcquire(TVMMutexID mutex, TVMTick timeout)
+{
+  MachineSuspendSignals(&sigs);
+  Mutex* mtx = findMutex(mutex);
+  int acquireState;
+  if (!mtx)
+  {
+    MachineResumeSignals(&sigs);
+    return VM_STATUS_ERROR_INVALID_ID;
+  }
+  else if (tick == VM_TIMEOUT_IMMEDIATE)
+  {
+    acquireState = tr->acquireMutex(mtx, timeout);
+    if (acquireState != ACQUIRE_SUCCESS)
+    {
+      MachineResumeSignals(&sigs);
+      return VM_STATUS_FAILURE;
+    }
+    if (acquireState == ACQUIRE_UNNECESSARY)
+    {
+      MachineResumeSignals(&sigs);
+      return VM_STATUS_ERROR_INVALID_ID;
+    }
+
+    MachineResumeSignals(&sigs);
+    return VM_STATUS_SUCCESS;
+  }
+  else
+  {
+    if (tr->acquireMutex(mtx, timeout) != ACQUIRE_SUCCESS)
+    {
+      tr->setTicks(timeout);
+      tr->setState(VM_THREAD_STATE_WAITING);
+      scheduler();
+    }
+  }//works for both finite and infinite timeouts
+  MachineResumeSignals(&sigs);
+  return VM_STATUS_SUCCESS;
+}//TVMStatus VMMutexAcquire(TVMMutexID mutex, TVMTick timeout)
+
+
 TVMStatus VMThreadSleep(TVMTick tick)
 {
   MachineSuspendSignals(&sigs);
@@ -432,4 +489,16 @@ void idle(void*)
   while(1);
 }//idles forever!
 
+
+Mutex* findMutex(TVMMutexID id)
+{
+  for (vector<Mutex*>::iterator itr = mutexes->begin() ; itr != mutexes->end() ; itr++)
+  {
+    if ( (*itr)->getID() == id )
+    {
+      return *itr;
+    }
+  }
+  return NULL;
+}
 
