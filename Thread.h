@@ -47,9 +47,9 @@ public:
   Thread();
   Thread(const TVMThreadPriority &pri, const TVMThreadState &st, TVMThreadIDRef tid, uint8_t *sb, TVMMemorySize ss, const ThreadEntry &entryFunc, void *p);
   ~Thread();
-  int acquireMutex(Mutex* mtx, TVMTick timeout);
+  int acquireMutex(Mutex* mtx, TVMTick timeout); // m
   void decrementTicks();
-  Mutex* findMutex(TVMMutexID id);
+  Mutex* findMutex(TVMMutexID id); // m
   volatile int getcd();
   SMachineContext* getContextRef();
   TVMThreadEntry getEntry();
@@ -57,7 +57,8 @@ public:
   TVMThreadPriority getPriority();
   volatile TVMThreadState getState();
   volatile int getTicks();
-  bool releaseMutex(TVMMutexID);
+  void releaseAllMutex();
+  bool releaseMutex(TVMMutexID); // m
   void setcd(volatile int calldata);
   void setContext(SMachineContext c);
   void setID(TVMThreadID newID);

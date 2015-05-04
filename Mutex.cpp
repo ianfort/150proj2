@@ -8,6 +8,7 @@ Mutex::Mutex()
   QTex = new queue<Thread*>;
   owner = NULL;
   id = idCounter;
+  cout << "ID is: " << id << endl;
   idCounter++;
 }//Mutex::Mutex()
 

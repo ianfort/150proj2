@@ -481,7 +481,7 @@ TVMStatus VMThreadTerminate(TVMThreadID thread)
     return VM_STATUS_ERROR_INVALID_STATE;
   }//requested thread already dead
   term->setState(VM_THREAD_STATE_DEAD);
-  //release all of term's mutexes here
+  term->releaseAllMutex();
   target = readyQ[term->getPriority()]->size();
   for (int i = 0; i < target; i++)
   {
@@ -556,6 +556,7 @@ void skeleton(void *tibia)
 {
   TVMThreadEntry func = ((Tibia*)tibia)->getEntry();
   func(((Tibia*)tibia)->getParam());
+  delete (Tibia*)tibia;
   VMThreadTerminate(*(tr->getIDRef()));
 }//3spoopy5me
 
