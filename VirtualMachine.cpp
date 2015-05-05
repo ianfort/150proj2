@@ -15,7 +15,6 @@ void skeleton(void* tibia);
 void idle(void*);
 Mutex* findMutex(TVMMutexID id);
 
-TVMThreadID nextID; //increment every time a thread is created. Decrement never.
 vector<Thread*> *threads;
 Thread *tr, *mainThread, *pt;
 queue<Thread*> *readyQ[NUM_RQS];
@@ -24,7 +23,6 @@ vector<Mutex*> *mutexes;
 
 TVMStatus VMStart(int tickms, int machinetickms, int argc, char *argv[])
 {
-  nextID = 0;
   TVMThreadID idletid;
 
   TVMMainEntry mainFunc = VMLoadModule(argv[0]);
